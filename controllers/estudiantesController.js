@@ -1,15 +1,86 @@
 const supabase = require('../supabase')
 
-//obtener todos los estudiantes
+/*//obtener todos los estudiantes sin filtro 
 const obtenerEstudiantes = async (req,res) => {
    try{
-        const {data, error} = await supabase.from('estudiantes').select('*')
+        const pagina = parseInt(req.query.page) || 1
+        const limite = 10
+        
+        const inicio = (pagina -1) * limite
+        const fin = inicio + limite - 1
+
+
+        console.log(req.query)
+        const {data, error} = await supabase.from('estudiantes').select('*').range(inicio,fin)
 
     if(error){
         throw error
     }
     
-    res.json(data)
+    res.json({
+        pagina,
+        cantidad:data.length,
+        datos:data 
+    })
+   }
+   catch(error){
+        console.error(error)
+        res.status(500).json({
+            mensaje: 'Error al obtener estudiante',
+            detalle: error.message
+        })
+   } 
+}
+*/
+
+//obtener estudiantes con filtro de nombre y curso 
+const obtenerEstudiantes = async (req,res) => {
+   try{
+        const pagina = parseInt(req.query.page) || 1
+        const limite = 10
+        
+        const inicio = (pagina -1) * limite
+        const fin = inicio + limite - 1
+
+        console.log(req.query)
+        let query= supabase.from('estudiantes').select('*')
+
+        console.log(typeof query)
+console.log(query)
+
+        if(req.query.nombre){
+            query=query.ilike(
+                'nombre',`%${req.query.nombre}%`
+            )
+        }
+
+        if(req.query.curso){
+            query = query.eq(
+                'curso',req.query.curso
+            )
+        }
+
+        if(req.query.page){
+            query = query.range(inicio,fin)
+        }
+
+        if(req.query.orden){
+            //query = query.order('nombre',{ascending:true})
+            query = query.order('id',{ascending:false})
+            //query = query.order('curso',{ascending:false})
+        }
+
+        const {data,error} = await query
+
+        if(error){
+            throw error
+        }
+        
+        res.json({
+            pagina,
+            cantidad:data.length,
+            datos:data 
+        })
    }
    catch(error){
         console.error(error)
@@ -48,11 +119,13 @@ const obtenerEstudianteporId = async (req,res) => {
 const crearEstudiante = async (req,res) => {
     try{
         const {nombre, curso} = req.body
+        const usuario_id = req.usuario.id
         const {data, error} =await supabase.from('estudiantes')
         .insert([
         {
             nombre,
-            curso
+            curso,
+            usuario_id
         }
         ])
         .select()
@@ -147,10 +220,92 @@ const eliminarEstudiante = async (req,res) => {
     }    
 }
 
+//ENDPOINT 1 VER SOLO MIS ESTUDIANTES POR ID USUARIO
+const obtenerMisEstudiantes = async (req,res) => {
+   try{
+        const usuario_id = req.usuario.id
+        console.log(req.usuario)
+        const {data, error} = await supabase.from('estudiantes').select('*').eq('usuario_id',usuario_id)
+
+    if(error){
+        throw error
+    }
+    
+    res.json(data)
+   }
+   catch(error){
+        console.error(error)
+        res.status(500).json({
+            mensaje: 'Error al obtener estudiante',
+            detalle: error.message
+        })
+   } 
+}
+
+//ENDPOINT 2. mostrar al estudiante junto con su usuario 
+const obtenerEstudiantesconUsuario = async (req, res) => {
+    try{
+        const {data, error} = await supabase.from('estudiantes')
+        .select(`*,usuario(id,nombre,email,rol)`)
+
+        if(error){
+            throw error
+        }
+
+        res.json(data)
+    }
+    catch(error){
+        res.status(500).json({
+            mensaje:error.message
+        })
+    }
+} 
+
+//ENDPOIND 3 SUbir archivo
+const subirArchivo = (req,res) => {
+    res.json({
+        mensaje:'Archivo subido',
+        archivo: req.file
+    })
+}
+
+const subirFotoEstudiante = async (req,res) => {
+    try{
+        const id = parseInt(req.params.id)
+        if(!req.file){
+            return res.status(400).json({
+                mensaje: 'Debe seleccdionar una imagen'
+            })
+        }
+        const {data, error} = await supabase.from('estudiantes')
+        .update({foto:req.file.filename})
+        .eq('id',id)
+        .select()
+
+        if(error){
+            throw error
+        }
+
+        res.json({
+            mensaje:'Foto actualizada',
+            estudiante: data
+        })
+    }
+    catch(error){
+        res.status(500).json({
+            mensaje:error.message
+        })
+    }
+}
+
 module.exports = {
     obtenerEstudiantes,
     obtenerEstudianteporId,
     crearEstudiante, 
     actualizarEstudiante,
-    eliminarEstudiante
+    eliminarEstudiante,
+    obtenerMisEstudiantes,
+    obtenerEstudiantesconUsuario,
+    subirArchivo,
+    subirFotoEstudiante
 }
